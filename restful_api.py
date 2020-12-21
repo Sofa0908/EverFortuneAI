@@ -14,7 +14,7 @@ db = SQLAlchemy(app)
 ma = Marshmallow(app)
 
 #===================================================================================================
-
+# Marshmallow model declarations, for better transition b/w sqlalchemy to json
 class Comments(db.Model):
   __tablename__ = 'Comments'
   __table_args__ = {"schema": "sys"}
@@ -128,7 +128,7 @@ class SiteStatusSchema(ma.Schema):
     # infoEng = ma.Nested(SiteInfoEngSchema)
 
 #===================================================================================================
-
+# user related methods
 @app.route('/register/', methods = ['POST'])
 def register():
   if request.method == 'POST' and request.json['password'] == request.json['password2']:
@@ -181,7 +181,7 @@ def logout():
   })
 
 #===================================================================================================
-
+# comment related methods
 @app.route('/comment/add/', methods = ['POST'])
 def addComment():
   if 'accName' not in session:
@@ -239,7 +239,7 @@ def updateComment():
       })
 
 #===================================================================================================
-
+# site related methods
 @app.route('/sortSite/', methods = ['GET'])
 @app.route('/sortSite/page/<int:page>', methods = ['GET'])
 def sortSite(page=1):
