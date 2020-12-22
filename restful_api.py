@@ -156,17 +156,17 @@ def register():
       return jsonify({ # Or return redirect(url_for('register'))
         'Status': f'Failed',
         'Message': f'User Already Exists, please try another accName'
-      })
+      }), 400
   else:
     return jsonify({ # Or return redirect(url_for('register'))
       'Status': f'Failed',
       'Message': f'Please check password again.'
-    })
+    }), 400
 
   return jsonify({ # Or return redirect(url_for('login'))
     'Status': f'Success',
     'Message': f'User registered.'
-  })
+  }), 200
 
 # Logs current user into the system [NOTE: New User log in WILL be able to overwrite current user's session]
 # Expected Input: accName (STR), password (STR)
@@ -182,12 +182,12 @@ def login():
       return jsonify({ # Or return redirect(url_for('home'))
         'Status': f'Success',
         'Message': f'User logged in.'
-      })
+      }), 200
     else:
       return jsonify({ # Or return redirect(url_for('login'))
         'Status': f'Failed',
         'Message': f'Account or Password incorrect.'
-      })
+      }), 400
 
 # Logs out current user
 @app.route('/logout/')
@@ -196,14 +196,14 @@ def logout():
     return jsonify({ # Or return redirect(url_for('login'))
       'Status': f'Failed',
       'Message': f'Not logged in, cannot log out'
-    })
+    }), 404
 
   session.pop('accName', None)
 
   return jsonify({ # Or return redirect(url_for('home'))
     'Status': f'Success',
     'Message': f'User logged out'
-  })
+  }), 200
 
 #===================================================================================================
 # Add Comments to site
@@ -214,7 +214,7 @@ def addComment():
     return jsonify({ # Or return redirect(url_for('login'))
       'Status': f'Failed',
       'Message': f'Please Login before commenting'
-    })
+    }), 401
   else:
     new_comment = Comments(
       commDet = request.json['comment'],
@@ -229,11 +229,11 @@ def addComment():
       return jsonify({ # Or return redirect(url_for('register'))
         'Status': f'Failed',
         'Message': e
-      })
+      }), 400
     return jsonify({ # Or return redirect(url_for('sitePage'))
       'Status': f'Success',
       'Message': f'Comment added'
-    })
+    }), 200
 
 # Remove Comments that belongs to current user
 # Expected Input: commID (INT)
@@ -243,7 +243,7 @@ def removeComment():
     return jsonify({ # Or return redirect(url_for('login'))
       'Status': f'Failed',
       'Message': f'Please Login before removing a comment'
-    })
+    }), 401
   else:
     trash = Comments.query.filter_by(commID=request.json['commID']).first()
     if trash and trash.userID == session['userID']:
@@ -252,12 +252,12 @@ def removeComment():
       return jsonify({ # Or return redirect(url_for('sitePage'))
         'Status': f'Success',
         'Message': f'Comment removed'
-      })
+      }), 200
     else:
       return jsonify({ # Or return redirect(url_for('sitePage'))
         'Status': f'Failed',
         'Message': f'Comment not found for removal or Comment does not belong to current user'
-      })
+      }), 400
 
 # Update Comment that belongs to current user
 # Expected Input: updatedComment (STR), commID (INT)
@@ -267,7 +267,7 @@ def updateComment():
     return jsonify({ # Or return redirect(url_for('login'))
       'Status': f'Failed',
       'Message': f'Please Login before updating a comment'
-    })
+    }), 401
   else:
     cargo = Comments.query.filter_by(commID=request.json['commID']).first()
     if cargo and cargo.userID == session['userID']:
@@ -276,12 +276,12 @@ def updateComment():
       return jsonify({ # Or return redirect(url_for('sitePage'))
         'Status': f'Success',
         'Message': f'Comment updated'
-      })
+      }), 200
     else:
       return jsonify({ # Or return redirect(url_for('sitePage'))
         'Status': f'Failed',
         'Message': f'Comment not found for update or Comment does not belong to current user'
-      })
+      }), 400
 
 #===================================================================================================
 # Sort site by comment count
@@ -302,8 +302,8 @@ def sortSite(page=1):
     return jsonify({
       'Status':f'Failed',
       'ErrorMessage':e
-    })
-  return jsonify({'Status':f'Success'},output)
+    }), 404
+  return jsonify({'Status':f'Success'},output), 200
 
 # Separates Chinese and English Character for filter
 def separateCHN(n):
@@ -348,9 +348,9 @@ def sortSiteWithSearch(page=1):
     return jsonify({
       'Status':f'Failed',
       'ErrorMessage':e
-    })
+    }), 404
 
-  return jsonify({'Status':f'Success'},output)
+  return jsonify({'Status':f'Success'},output), 200
 
 # Return sites with no bike
 @app.route('/siteWithNoBike/', methods = ['GET'])
@@ -363,9 +363,9 @@ def getSiteWithNoBike():
     return jsonify({
       'Status':f'Failed',
       'ErrorMessage':e
-    })
+    }), 404
 
-  return jsonify({'Status':f'Success'},output)
+  return jsonify({'Status':f'Success'},output), 200
 
 if __name__ == '__main__':
   app.run(debug=True)
