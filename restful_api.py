@@ -154,6 +154,7 @@ def register():
       db.session.add(new_user)
       db.session.commit()
     except exc.IntegrityError as e:
+      db.session.rollback()
       return jsonify({ # Or return redirect(url_for('register'))
         'Status': f'Failed',
         'Message': f'User Already Exists, please try another accName'
@@ -301,7 +302,8 @@ def sortSite(page=1):
   return jsonify({'Status':f'Success'},output)
 
 # Separates Chinese and English Character for filter
-def separateCHN(n, n_c):
+def separateCHN(n):
+  n_c = ''
   for i in re.findall(r'[\u4e00-\u9fff]+', n):
     n = n.replace(i, '')
     n_c+=i
@@ -315,8 +317,6 @@ def sortSiteWithSearch(page=1):
   area = request.args.get('area', '', type=str)
   name = request.args.get('name', '', type=str)
   ROWS_PER_PAGE = 100
-  name_CHN = ''
-  area_CHN = ''
   try:
     result = db.session.query(SiteStatus) \
             .join(Comments, Comments.siteID == SiteStatus.siteID, isouter=True) \
@@ -328,9 +328,9 @@ def sortSiteWithSearch(page=1):
     output = site_schema.dump(result.items)
     
     if area:
-      area, area_CHN = separateCHN(area, area_CHN)
+      area, area_CHN = separateCHN(area)
     if name:  
-      name, name_CHN = separateCHN(name, name_CHN)
+      name, name_CHN = separateCHN(name)
 
     for item in list(output):
       if (len(name_CHN) > 0 and name_CHN not in item['info'][0]['siteName'].lower()) or \
