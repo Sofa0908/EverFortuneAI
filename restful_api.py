@@ -3,8 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_restful import Api
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_marshmallow import Marshmallow
-import json
-from sqlalchemy.orm.strategy_options import joinedload
+import re
 
 app = Flask(__name__)
 api = Api(app)
@@ -124,6 +123,11 @@ class SiteInfoEngSchema(ma.Schema):
     model = SiteInfoEng
     fields = ('siteID', 'siteNameEN', 'siteAreaEN', 'addrEN')
 
+class SiteStatusSchema(ma.Schema):
+  class Meta:  
+    model = SiteStatus
+    fields = ('siteID', 'avalBike', 'modTime', 'act', 'remainSpace')
+
 class SiteStatusNestSchema(ma.Schema):
   class Meta:
     model = SiteStatus
@@ -131,12 +135,6 @@ class SiteStatusNestSchema(ma.Schema):
   data = ma.Nested(SiteDataSchema, many=True)
   info = ma.Nested(SiteInfoSchema, many=True)
   infoEng = ma.Nested(SiteInfoEngSchema, many=True)
-
-class SiteStatusSchema(ma.Schema):
-  class Meta:  
-    model = SiteStatus
-    fields = ('siteID', 'avalBike', 'modTime', 'act', 'remainSpace')
-
 
 #===================================================================================================
 # user related methods
@@ -252,7 +250,6 @@ def updateComment():
 #===================================================================================================
 # site related methods
 @app.route('/sortSite/', methods = ['GET'])
-@app.route('/sortSite/page/<int:page>', methods = ['GET'])
 def sortSite(page=1):
   page = request.args.get('page', 1, type=int)
   ROWS_PER_PAGE = 100
@@ -266,12 +263,57 @@ def sortSite(page=1):
   site_schema = SiteStatusNestSchema(many=True)
   output = site_schema.dump(result.items)
 
+  for item in list(output):
+    if item['info'][0]['siteArea'] != "松山區":
+      output.remove(item)
+
   return jsonify(output)
 
 @app.route('/sortSiteWithSearch/', methods = ['GET'])
-def sortSiteWithSearch():
-  # This is gonna be a pain tmr...
-  return 'hi'
+def sortSiteWithSearch(page=1):
+  page = request.args.get('page', 1, type=int)
+  area = request.args.get('area', '', type=str)
+  name = request.args.get('name', '', type=str)
+  ROWS_PER_PAGE = 100
+  
+  result = db.session.query(SiteStatus) \
+          .join(Comments, Comments.siteID == SiteStatus.siteID, isouter=True) \
+          .group_by(SiteStatus.siteID) \
+          .order_by(db.func.count(Comments.commID).desc()) \
+          .paginate(page=page, per_page=ROWS_PER_PAGE)
+
+  site_schema = SiteStatusNestSchema(many=True)
+  output = site_schema.dump(result.items)
+
+  #Separate chinese and english characers
+  area_CHN = ""
+  for n in re.findall(r'[\u4e00-\u9fff]+', area):
+    area = area.replace(n, '')
+    area_CHN+=n
+
+
+  #Separate chinese and english characers
+  name_CHN = ""
+  for n in re.findall(r'[\u4e00-\u9fff]+', name):
+    name = name.replace(n, '')
+    name_CHN+=n
+
+  print(area)
+  print(len(area))
+  print(area_CHN)
+  print(len(area_CHN))
+
+  print(name)
+  print(len(name))
+  print(name_CHN)
+  print(len(name_CHN))
+
+  for item in list(output):
+    
+    if area not in item['info'][0]['siteArea'] or name not in item['info'][0]['siteName']:
+      output.remove(item)
+
+  return jsonify(output)
 
 @app.route('/getSiteWithNoBike/', methods = ['GET'])
 def getSiteWithNoBike():
