@@ -126,11 +126,14 @@ if __name__ == "__main__":
       sys.exit()
     if len(cur.fetchall()) < 1:
       result = first_parser(data, cur)
+      print('add new')
     else:
       result = updater(data, cur)
+      print('update')
 
   if result:
     conn.commit()
+    print('committed')
 
   cur.close()
   conn.close()
