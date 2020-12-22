@@ -124,13 +124,19 @@ class SiteInfoEngSchema(ma.Schema):
     model = SiteInfoEng
     fields = ('siteID', 'siteNameEN', 'siteAreaEN', 'addrEN')
 
-class SiteStatusSchema(ma.Schema):
+class SiteStatusNestSchema(ma.Schema):
   class Meta:
     model = SiteStatus
     fields = ('siteID', 'avalBike', 'modTime', 'act', 'remainSpace', 'data', 'info', 'infoEng')
   data = ma.Nested(SiteDataSchema, many=True)
   info = ma.Nested(SiteInfoSchema, many=True)
   infoEng = ma.Nested(SiteInfoEngSchema, many=True)
+
+class SiteStatusSchema(ma.Schema):
+  class Meta:  
+    model = SiteStatus
+    fields = ('siteID', 'avalBike', 'modTime', 'act', 'remainSpace')
+
 
 #===================================================================================================
 # user related methods
@@ -257,9 +263,7 @@ def sortSite(page=1):
           .order_by(db.func.count(Comments.commID).desc()) \
           .paginate(page=page, per_page=ROWS_PER_PAGE)
 
-  print(result.items)
-  print(len(result.items))
-  site_schema = SiteStatusSchema(many=True)
+  site_schema = SiteStatusNestSchema(many=True)
   output = site_schema.dump(result.items)
 
   return jsonify(output)
