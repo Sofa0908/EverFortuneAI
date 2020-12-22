@@ -224,8 +224,15 @@ def addComment():
       userID = session['userID'],
       siteID = request.json['siteID']
     )
-    db.session.add(new_comment)
-    db.session.commit()
+    try:
+      db.session.add(new_comment)
+      db.session.commit()
+    except exc.DBAPIError as e:
+      db.session.rollback()
+      return jsonify({ # Or return redirect(url_for('register'))
+        'Status': f'Failed',
+        'Message': e
+      })
     return jsonify({ # Or return redirect(url_for('sitePage'))
       'Status': f'Success',
       'Message': f'Comment added'
