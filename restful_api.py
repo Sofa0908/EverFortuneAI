@@ -298,19 +298,14 @@ def sortSiteWithSearch(page=1):
     name = name.replace(n, '')
     name_CHN+=n
 
-  print(area)
-  print(len(area))
-  print(area_CHN)
-  print(len(area_CHN))
-
-  print(name)
-  print(len(name))
-  print(name_CHN)
-  print(len(name_CHN))
-
   for item in list(output):
-    
-    if area not in item['info'][0]['siteArea'] or name not in item['info'][0]['siteName']:
+    if len(name_CHN) > 0 and name_CHN not in item['info'][0]['siteName']:
+      output.remove(item)
+    if len(area_CHN)> 0 and area_CHN not in item['info'][0]['siteArea']:
+      output.remove(item)
+    if len(name) > 0 and name not in item['infoEng'][0]['siteNameEN']:
+      output.remove(item)
+    if len(area)> 0 and area not in item['infoEng'][0]['siteAreaEN']:
       output.remove(item)
 
   return jsonify(output)
