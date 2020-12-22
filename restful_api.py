@@ -4,6 +4,7 @@ from flask_restful import Api
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_marshmallow import Marshmallow
 import json
+from sqlalchemy.orm.strategy_options import joinedload
 
 app = Flask(__name__)
 api = Api(app)
@@ -52,9 +53,9 @@ class SiteStatus(db.Model):
   modTime = db.Column(db.String(14))
   act = db.Column(db.Boolean)
   remainSpace = db.Column(db.Integer)
-  # data = db.relationship("SiteData", backref="Site_Status")
-  # info = db.relationship("SiteInfo", backref="Site_Status")
-  # infoEng = db.relationship("SiteInfoEng", backref="Site_Status")
+  data = db.relationship("SiteData", backref="Site_Status")
+  info = db.relationship("SiteInfo", backref="Site_Status")
+  infoEng = db.relationship("SiteInfoEng", backref="Site_Status")
 
   def __init__(self, siteID, avalBike, modTime, act, remainSpace):
     self.siteID = siteID
@@ -110,22 +111,26 @@ class SiteInfoEng(db.Model):
 
 class SiteDataSchema(ma.Schema):
   class Meta:
+    model = SiteData
     fields = ('siteID', 'totalSlot', 'Lat', 'Lng')
   
 class SiteInfoSchema(ma.Schema):
   class Meta:
+    model = SiteInfo
     fields = ('siteID', 'siteName', 'siteArea', 'addr')
 
 class SiteInfoEngSchema(ma.Schema):
   class Meta:
+    model = SiteInfoEng
     fields = ('siteID', 'siteNameEN', 'siteAreaEN', 'addrEN')
 
 class SiteStatusSchema(ma.Schema):
   class Meta:
-    fields = ('siteID', 'avalBike', 'modTime', 'act', 'remainSpace')
-    # data = ma.Nested(SiteDataSchema)
-    # info = ma.Nested(SiteInfoSchema)
-    # infoEng = ma.Nested(SiteInfoEngSchema)
+    model = SiteStatus
+    fields = ('siteID', 'avalBike', 'modTime', 'act', 'remainSpace', 'data', 'info', 'infoEng')
+  data = ma.Nested(SiteDataSchema, many=True)
+  info = ma.Nested(SiteInfoSchema, many=True)
+  infoEng = ma.Nested(SiteInfoEngSchema, many=True)
 
 #===================================================================================================
 # user related methods
@@ -252,19 +257,8 @@ def sortSite(page=1):
           .order_by(db.func.count(Comments.commID).desc()) \
           .paginate(page=page, per_page=ROWS_PER_PAGE)
 
-  # Can't figure out how to return a nested Schema
-  # result = db.session.query(SiteStatus, SiteData, SiteInfo, SiteInfoEng) \
-  #         .join(Comments, Comments.siteID == SiteStatus.siteID, isouter=True) \
-  #         .join(SiteData, SiteData.siteID == SiteStatus.siteID, isouter=True) \
-  #         .join(SiteInfo, SiteInfo.siteID == SiteStatus.siteID, isouter=True) \
-  #         .join(SiteInfoEng, SiteInfoEng.siteID == SiteStatus.siteID, isouter=True) \
-  #         .group_by(SiteStatus.siteID) \
-  #         .order_by(db.func.count(Comments.commID).desc()) \
-  #         .paginate(page=page, per_page=ROWS_PER_PAGE)
-  
   print(result.items)
   print(len(result.items))
-
   site_schema = SiteStatusSchema(many=True)
   output = site_schema.dump(result.items)
 
