@@ -263,10 +263,6 @@ def sortSite(page=1):
   site_schema = SiteStatusNestSchema(many=True)
   output = site_schema.dump(result.items)
 
-  for item in list(output):
-    if item['info'][0]['siteArea'] != "松山區":
-      output.remove(item)
-
   return jsonify(output)
 
 # Separates Chinese and English Character for filter
@@ -275,7 +271,7 @@ def separateCHN(n, n_c):
     n = n.replace(i, '')
     n_c+=i
 
-  return n, n_c
+  return n.strip(' ').lower(), n_c.strip(' ').lower()
 
 @app.route('/sortSiteWithSearch/', methods = ['GET'])
 def sortSiteWithSearch(page=1):
@@ -300,11 +296,12 @@ def sortSiteWithSearch(page=1):
   name, name_CHN = separateCHN(name, name_CHN)
 
   for item in list(output):
-    if (len(name_CHN) > 0 and name_CHN not in item['info'][0]['siteName']) or \
-      (len(area_CHN)> 0 and area_CHN not in item['info'][0]['siteArea']):
+    if (len(name_CHN) > 0 and name_CHN not in item['info'][0]['siteName'].lower()) or \
+      (len(area_CHN)> 0 and area_CHN not in item['info'][0]['siteArea'].lower()):
       output.remove(item)
-    if (len(name) > 0 and name not in item['infoEng'][0]['siteNameEN']) or \
-      (len(area)> 0 and area not in item['infoEng'][0]['siteAreaEN']):
+    if ((len(name) > 0 and name not in item['infoEng'][0]['siteNameEN'].lower()) or \
+      (len(area)> 0 and area not in item['infoEng'][0]['siteAreaEN'].lower())) and \
+      item in output:
       output.remove(item)
 
   return jsonify(output)
