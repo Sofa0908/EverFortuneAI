@@ -9,9 +9,7 @@ import re
 
 app = Flask("EverFortuneAI")
 api = Api(app)
-app.config['SECRET_KEY'] = 't;6ru8 54s/6'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:Nocompl3x!@localhost/sys'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config.from_pyfile('config.py')
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 
