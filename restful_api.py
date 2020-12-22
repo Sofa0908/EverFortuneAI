@@ -8,6 +8,14 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import exc
 from werkzeug.security import check_password_hash, generate_password_hash
 
+# from resources import (
+#   UserRegistration,
+#   UserLogin,
+#   UserLogoutAccess,
+#   UserLogoutRefresh,
+#   TokenRefresh,
+#   TestSecretAccess
+# )
 from config import *
 from models import *
 
@@ -17,6 +25,30 @@ app.config.from_object(MyConfig)
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 jwt = JWTManager(app)
+
+##### BELOW IS JWT RELATED #####
+
+@jwt.token_in_blacklist_loader
+def check_if_token_in_blacklist(decrypted_token):
+  jti = decrypted_token['jti']
+  return models.RevokedTokenModel.is_jti_blacklisted(jti)
+
+# api.add_resource(UserRegistration, '/JWTregistration')
+# api.add_resource(UserLogin, '/JWTlogin')
+# api.add_resource(UserLogoutAccess, '/JWTlogout/access')
+# api.add_resource(UserLogoutRefresh, '/JWTlogout/refresh')
+# api.add_resource(TokenRefresh, '/token/refresh')
+# api.add_resource(TestSecretAccess, '/secret')
+
+##### ABOVE IS JWT RELATED #####
+
+'''
+I tried to replace my simple user management with JWT for a more well 
+rounded solution. However I got stuck on python doesn't allow me to import 
+my resouces.py file (Hence the commented out lines above, code wouldn't run with it). 
+Still trying to figure out how to solve this problem, But due to time constraints 
+I thought it would be better if I can turn it in on Wednesday Morning.
+'''
 
 # Register user into the system
 # Expected Input: accName (STR), displayName (STR), password (STR), password2 (STR)
@@ -36,7 +68,8 @@ def register():
       db.session.rollback()
       return jsonify({ # Or return redirect(url_for('register'))
         'Status': f'Failed',
-        'Message': f'User Already Exists, please try another accName'
+        'Message': f'User already exists, please tyr another accName',
+        'Error': str(e)
       }), 400
   else:
     return jsonify({ # Or return redirect(url_for('register'))
@@ -54,13 +87,17 @@ def register():
 # Expected Input: accName (STR), password (STR)
 @app.route('/login/', methods = ['POST'])
 def login():
+  if 'accName' in session:
+    return jsonify({ # Or return redirect(url_for('login'))
+      'Status': f'Failed',
+      'Message': f'Already Logged in, please log out first'
+    }), 400
   user = UserLogin.query.filter_by(accName=request.json['accName']).first()
   if user:
     if check_password_hash(user.pwHash, request.json['password']):
       session['userID'] = user.userID
       session['accName'] = user.accName
       session['displayName'] = user.displayName
-      session['logged_in'] = True
       return jsonify({ # Or return redirect(url_for('home'))
         'Status': f'Success',
         'Message': f'User logged in.'
@@ -78,8 +115,8 @@ def logout():
     return jsonify({ # Or return redirect(url_for('login'))
       'Status': f'Failed',
       'Message': f'Not logged in, cannot log out'
-    }), 404
-  session['logged_in'] = False
+    }), 400
+
   session.pop('accName', None)
 
   return jsonify({ # Or return redirect(url_for('home'))
@@ -92,7 +129,7 @@ def logout():
 # Expected Input: siteID (CHAR(4)), comment (STR)
 @app.route('/comment/add/', methods = ['POST'])
 def addComment():
-  if 'accName' not in session and session['logged_in']:
+  if 'accName' not in session:
     return jsonify({ # Or return redirect(url_for('login'))
       'Status': f'Failed',
       'Message': f'Please Login before commenting'
@@ -106,11 +143,11 @@ def addComment():
     try:
       db.session.add(new_comment)
       db.session.commit()
-    except exc.DBAPIError as e:
+    except exc.InvalidRequestError as e:
       db.session.rollback()
       return jsonify({ # Or return redirect(url_for('register'))
         'Status': f'Failed',
-        'Message': e
+        'Error': str(e)
       }), 400
     return jsonify({ # Or return redirect(url_for('sitePage'))
       'Status': f'Success',
@@ -121,16 +158,25 @@ def addComment():
 # Expected Input: commID (INT)
 @app.route('/comment/remove/', methods = ['POST'])
 def removeComment():
-  if 'accName' not in session and session['logged_in']:
+  if 'accName' not in session:
     return jsonify({ # Or return redirect(url_for('login'))
       'Status': f'Failed',
       'Message': f'Please Login before removing a comment'
     }), 401
   else:
-    trash = Comments.query.filter_by(commID=request.json['commID']).first()
+    trash = Comments.query.filter_by(commID=int(request.json['commID'])).first()
     if trash and trash.userID == session['userID']:
-      db.session.delete(trash)
-      db.session.commit()
+      try:
+        current_session = db.session.object_session(trash)
+        current_session.delete(trash)
+        current_session.commit()
+      except exc.InvalidRequestError as e:
+        db.session.rollback()
+        return jsonify({ # Or return redirect(url_for('register'))
+          'Status': f'Failed',
+          'Message': str(e)
+        }), 400
+      
       return jsonify({ # Or return redirect(url_for('sitePage'))
         'Status': f'Success',
         'Message': f'Comment removed'
@@ -145,16 +191,24 @@ def removeComment():
 # Expected Input: updatedComment (STR), commID (INT)
 @app.route('/comment/update/', methods = ['POST'])
 def updateComment():
-  if 'accName' not in session and session['logged_in']:
+  if 'accName' not in session:
     return jsonify({ # Or return redirect(url_for('login'))
       'Status': f'Failed',
       'Message': f'Please Login before updating a comment'
     }), 401
   else:
-    cargo = Comments.query.filter_by(commID=request.json['commID']).first()
+    cargo = Comments.query.filter_by(commID=int(request.json['commID'])).first()
     if cargo and cargo.userID == session['userID']:
-      cargo.commDet = request.json['updatedComment']
-      db.session.commit()
+      try:
+        current_session = db.session.object_session(cargo)
+        cargo.commDet = request.json['updatedComment']
+        current_session.commit()
+      except exc.InvalidRequestError as e:
+        db.session.rollback()
+        return jsonify({ # Or return redirect(url_for('register'))
+          'Status': f'Failed',
+          'Error': str(e)
+        }), 400
       return jsonify({ # Or return redirect(url_for('sitePage'))
         'Status': f'Success',
         'Message': f'Comment updated'
@@ -180,9 +234,10 @@ def sortSite(page=1):
 
     site_schema = SiteStatusNestSchema(many=True)
     output = site_schema.dump(result.items)
-  except exc.DBAPIError as e:
+  except exc.InvalidRequestError as e:
     return jsonify({
-      'Status':f'Failed'
+      'Status':f'Failed',
+      'Error': str(e)
     }), 404
   return jsonify({'Status':f'Success'},output), 200
 
@@ -225,9 +280,10 @@ def sortSiteWithSearch(page=1):
         (len(area)> 0 and area not in item['infoEng'][0]['siteAreaEN'].lower())) and \
         item in output:
         output.remove(item)
-  except exc.DBAPIError as e:
+  except exc.InvalidRequestError as e:
     return jsonify({
-      'Status':f'Failed'
+      'Status':f'Failed',
+      'Error': str(e)
     }), 404
 
   return jsonify({'Status':f'Success'},output), 200
@@ -239,10 +295,10 @@ def getSiteWithNoBike():
     sites = SiteStatus.query.filter_by(avalBike=0).all()
     site_schema = SiteStatusSchema(many=True)
     output = site_schema.dump(sites)
-  except exc.DBAPIError as e:
+  except exc.InvalidRequestError as e:
     return jsonify({
       'Status':f'Failed',
-      'ErrorMessage':e
+      'Error': str(e)
     }), 404
 
   return jsonify({'Status':f'Success'},output), 200

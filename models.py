@@ -15,20 +15,6 @@ class Comments(db.Model):
     self.userID = userID
     self.siteID = siteID
 
-class UserLogin(db.Model):
-  __tablename__ = 'User_Login'
-  __table_args__ = {"schema": "sys"}
-
-  userID = db.Column(db.Integer, primary_key=True)
-  accName = db.Column(db.String(30), unique=True)
-  displayName = db.Column(db.String(30))
-  pwHash = db.Column(db.String(40))
-
-  def __init__(self, accName, displayName, pwHash):
-    self.accName = accName
-    self.displayName = displayName
-    self.pwHash = pwHash
-
 class SiteStatus(db.Model):
   __tablename__ = 'Site_Status'
   __table_args__ = {"schema": "sys"}
@@ -127,3 +113,60 @@ class SiteStatusNestSchema(ma.Schema):
   data = ma.Nested(SiteDataSchema, many=True)
   info = ma.Nested(SiteInfoSchema, many=True)
   infoEng = ma.Nested(SiteInfoEngSchema, many=True)
+
+# User Model class, I apologize for the bad name, 
+# I named it early for the sake of User Login Info...
+class UserLogin(db.Model):
+  __tablename__ = 'User_Login'
+  __table_args__ = {"schema": "sys"}
+
+  userID = db.Column(db.Integer, primary_key=True)
+  accName = db.Column(db.String(120), unique=True)
+  displayName = db.Column(db.String(30))
+  pwHash = db.Column(db.String(120))
+
+  def __init__(self, accName, displayName, pwHash):
+    self.accName = accName
+    self.displayName = displayName
+    self.pwHash = pwHash
+
+#===========================================================================
+  # Below are methods & class made to cope with JWT
+  
+  # save user to db
+  def save_to_db(self):
+    db.session.add(self)
+    db.session.commit()
+  
+  # find user by name
+  @classmethod
+  def find_by_accName(cls, accName):
+    return cls.query.filter_by(accName=accName).first()
+
+  # generate hash from pw
+  @staticmethod
+  def generate_hash(pwHash):
+    return sha256.hash(pwHash)
+  
+  # verify hash from pw
+  @staticmethod
+  def verify_hash(pwHash, hash_):
+    return sha256.verify(pwHash, hash_)
+
+# Revoked Token Class
+class RevokedTokenModel(db.Model):
+  __tablename__ = 'revoked_tokens'
+  id = db.Column(db.Integer, primary_key=True)
+  # jti stans for JWT ID
+  jti = db.Column(db.String(120))
+
+  # Save token to db
+  def add(self):
+    db.session.add(self)
+    db.session.commit()
+
+  # check if token is black listed
+  @classmethod
+  def is_jti_blacklisted(cls, jti):
+    query = cls.query.filter_by(jti=jti).first
+    return bool(query)
