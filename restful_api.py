@@ -7,7 +7,7 @@ from sqlalchemy import exc
 import re
 
 
-app = Flask(__name__)
+app = Flask("EverFortuneAI")
 api = Api(app)
 app.config['SECRET_KEY'] = 't;6ru8 54s/6'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:Nocompl3x!@localhost/sys'
