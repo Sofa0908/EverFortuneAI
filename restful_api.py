@@ -280,7 +280,7 @@ def updateComment():
 
 #===================================================================================================
 # Sort site by comment count
-@app.route('/sortSite/', methods = ['GET'])
+@app.route('/siteByComment/', methods = ['GET'])
 def sortSite(page=1):
   page = request.args.get('page', 1, type=int)
   ROWS_PER_PAGE = 100
@@ -309,7 +309,7 @@ def separateCHN(n, n_c):
 
 # Sort site by comment count with area/name filters
 # Expected Input:  page (INT) | area (STR) | name (STR)
-@app.route('/sortSiteWithSearch/', methods = ['GET'])
+@app.route('/siteWithSearch/', methods = ['GET'])
 def sortSiteWithSearch(page=1):
   page = request.args.get('page', 1, type=int)
   area = request.args.get('area', '', type=str)
@@ -349,7 +349,7 @@ def sortSiteWithSearch(page=1):
   return jsonify({'Status':f'Success'},output)
 
 # Return sites with no bike
-@app.route('/getSiteWithNoBike/', methods = ['GET'])
+@app.route('/siteWithNoBike/', methods = ['GET'])
 def getSiteWithNoBike():
   try:
     sites = SiteStatus.query.filter_by(avalBike=0).all()
