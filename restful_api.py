@@ -269,6 +269,14 @@ def sortSite(page=1):
 
   return jsonify(output)
 
+# Separates Chinese and English Character for filter
+def separateCHN(n, n_c):
+  for i in re.findall(r'[\u4e00-\u9fff]+', n):
+    n = n.replace(i, '')
+    n_c+=i
+
+  return n, n_c
+
 @app.route('/sortSiteWithSearch/', methods = ['GET'])
 def sortSiteWithSearch(page=1):
   page = request.args.get('page', 1, type=int)
@@ -285,27 +293,18 @@ def sortSiteWithSearch(page=1):
   site_schema = SiteStatusNestSchema(many=True)
   output = site_schema.dump(result.items)
 
-  #Separate chinese and english characers
   area_CHN = ""
-  for n in re.findall(r'[\u4e00-\u9fff]+', area):
-    area = area.replace(n, '')
-    area_CHN+=n
+  area, area_CHN = separateCHN(area, area_CHN)
 
-
-  #Separate chinese and english characers
   name_CHN = ""
-  for n in re.findall(r'[\u4e00-\u9fff]+', name):
-    name = name.replace(n, '')
-    name_CHN+=n
+  name, name_CHN = separateCHN(name, name_CHN)
 
   for item in list(output):
-    if len(name_CHN) > 0 and name_CHN not in item['info'][0]['siteName']:
+    if (len(name_CHN) > 0 and name_CHN not in item['info'][0]['siteName']) or \
+      (len(area_CHN)> 0 and area_CHN not in item['info'][0]['siteArea']):
       output.remove(item)
-    if len(area_CHN)> 0 and area_CHN not in item['info'][0]['siteArea']:
-      output.remove(item)
-    if len(name) > 0 and name not in item['infoEng'][0]['siteNameEN']:
-      output.remove(item)
-    if len(area)> 0 and area not in item['infoEng'][0]['siteAreaEN']:
+    if (len(name) > 0 and name not in item['infoEng'][0]['siteNameEN']) or \
+      (len(area)> 0 and area not in item['infoEng'][0]['siteAreaEN']):
       output.remove(item)
 
   return jsonify(output)
