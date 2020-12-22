@@ -143,7 +143,7 @@ class SiteStatusNestSchema(ma.Schema):
 # Expected Input: accName (STR), displayName (STR), password (STR), password2 (STR)
 @app.route('/register/', methods = ['POST'])
 def register():
-  if request.method == 'POST' and request.json['password'] == request.json['password2']:
+  if request.json['password'] == request.json['password2']:
     hashed_pw = generate_password_hash(request.json['password'], method='sha256')
     new_user = UserLogin(
       accName = request.json['accName'],
@@ -174,23 +174,22 @@ def register():
 # Expected Input: accName (STR), password (STR)
 @app.route('/login/', methods = ['POST'])
 def login():
-  if request.method == 'POST':
-    user = UserLogin.query.filter_by(accName=request.json['accName']).first()
-    if user:
-      if check_password_hash(user.pwHash, request.json['password']):
-        session['userID'] = user.userID
-        session['accName'] = user.accName
-        session['displayName'] = user.displayName
-        
-        return jsonify({ # Or return redirect(url_for('home'))
-          'Status': f'Success',
-          'Message': f'User logged in.'
-        })
-      else:
-        return jsonify({ # Or return redirect(url_for('login'))
-          'Status': f'Failed',
-          'Message': f'Account or Password incorrect.'
-        })
+  user = UserLogin.query.filter_by(accName=request.json['accName']).first()
+  if user:
+    if check_password_hash(user.pwHash, request.json['password']):
+      session['userID'] = user.userID
+      session['accName'] = user.accName
+      session['displayName'] = user.displayName
+      
+      return jsonify({ # Or return redirect(url_for('home'))
+        'Status': f'Success',
+        'Message': f'User logged in.'
+      })
+    else:
+      return jsonify({ # Or return redirect(url_for('login'))
+        'Status': f'Failed',
+        'Message': f'Account or Password incorrect.'
+      })
 
 # Logs out current user
 @app.route('/logout/')
