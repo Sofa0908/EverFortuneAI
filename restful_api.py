@@ -3,7 +3,9 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_restful import Api
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_marshmallow import Marshmallow
+from sqlalchemy import exc
 import re
+
 
 app = Flask(__name__)
 api = Api(app)
@@ -137,7 +139,8 @@ class SiteStatusNestSchema(ma.Schema):
   infoEng = ma.Nested(SiteInfoEngSchema, many=True)
 
 #===================================================================================================
-# user related methods
+# Register user into the system
+# Expected Input: accName (STR), displayName (STR), password (STR), password2 (STR)
 @app.route('/register/', methods = ['POST'])
 def register():
   if request.method == 'POST' and request.json['password'] == request.json['password2']:
@@ -147,17 +150,27 @@ def register():
       displayName = request.json['displayName'],
       pwHash = hashed_pw
     )
-    db.session.add(new_user)
-    db.session.commit()
+    try:
+      db.session.add(new_user)
+      db.session.commit()
+    except exc.IntegrityError as e:
+      return jsonify({ # Or return redirect(url_for('register'))
+        'Status': f'Failed',
+        'Message': f'User Already Exists, please try another accName'
+      })
   else:
     return jsonify({ # Or return redirect(url_for('register'))
+      'Status': f'Failed',
       'Message': f'Please check password again.'
     })
 
   return jsonify({ # Or return redirect(url_for('login'))
+    'Status': f'Success',
     'Message': f'User registered.'
   })
 
+# Logs current user into the system [NOTE: New User log in WILL be able to overwrite current user's session]
+# Expected Input: accName (STR), password (STR)
 @app.route('/login/', methods = ['POST'])
 def login():
   if request.method == 'POST':
@@ -169,32 +182,39 @@ def login():
         session['displayName'] = user.displayName
         
         return jsonify({ # Or return redirect(url_for('home'))
+          'Status': f'Success',
           'Message': f'User logged in.'
         })
       else:
         return jsonify({ # Or return redirect(url_for('login'))
+          'Status': f'Failed',
           'Message': f'Account or Password incorrect.'
         })
-        
+
+# Logs out current user
 @app.route('/logout/')
 def logout():
   if 'accName' not in session:
     return jsonify({ # Or return redirect(url_for('login'))
+      'Status': f'Failed',
       'Message': f'Not logged in, cannot log out'
     })
 
   session.pop('accName', None)
 
   return jsonify({ # Or return redirect(url_for('home'))
+    'Status': f'Success',
     'Message': f'User logged out'
   })
 
 #===================================================================================================
-# comment related methods
+# Add Comments to site
+# Expected Input: siteID (CHAR(4)), comment (STR)
 @app.route('/comment/add/', methods = ['POST'])
 def addComment():
   if 'accName' not in session:
     return jsonify({ # Or return redirect(url_for('login'))
+      'Status': f'Failed',
       'Message': f'Please Login before commenting'
     })
   else:
@@ -206,13 +226,17 @@ def addComment():
     db.session.add(new_comment)
     db.session.commit()
     return jsonify({ # Or return redirect(url_for('sitePage'))
+      'Status': f'Success',
       'Message': f'Comment added'
     })
 
+# Remove Comments that belongs to current user
+# Expected Input: commID (INT)
 @app.route('/comment/remove/', methods = ['POST'])
 def removeComment():
   if 'accName' not in session:
     return jsonify({ # Or return redirect(url_for('login'))
+      'Status': f'Failed',
       'Message': f'Please Login before removing a comment'
     })
   else:
@@ -221,17 +245,22 @@ def removeComment():
       db.session.delete(trash)
       db.session.commit()
       return jsonify({ # Or return redirect(url_for('sitePage'))
+        'Status': f'Success',
         'Message': f'Comment removed'
       })
     else:
       return jsonify({ # Or return redirect(url_for('sitePage'))
+        'Status': f'Failed',
         'Message': f'Comment not found for removal or Comment does not belong to current user'
       })
 
+# Update Comment that belongs to current user
+# Expected Input: updatedComment (STR), commID (INT)
 @app.route('/comment/update/', methods = ['POST'])
 def updateComment():
   if 'accName' not in session:
     return jsonify({ # Or return redirect(url_for('login'))
+      'Status': f'Failed',
       'Message': f'Please Login before updating a comment'
     })
   else:
@@ -240,80 +269,99 @@ def updateComment():
       cargo.commDet = request.json['updatedComment']
       db.session.commit()
       return jsonify({ # Or return redirect(url_for('sitePage'))
+        'Status': f'Success',
         'Message': f'Comment updated'
       })
     else:
       return jsonify({ # Or return redirect(url_for('sitePage'))
+        'Status': f'Failed',
         'Message': f'Comment not found for update or Comment does not belong to current user'
       })
 
 #===================================================================================================
-# site related methods
+# Sort site by comment count
 @app.route('/sortSite/', methods = ['GET'])
 def sortSite(page=1):
   page = request.args.get('page', 1, type=int)
   ROWS_PER_PAGE = 100
-  
-  result = db.session.query(SiteStatus) \
-          .join(Comments, Comments.siteID == SiteStatus.siteID, isouter=True) \
-          .group_by(SiteStatus.siteID) \
-          .order_by(db.func.count(Comments.commID).desc()) \
-          .paginate(page=page, per_page=ROWS_PER_PAGE)
+  try:
+    result = db.session.query(SiteStatus) \
+            .join(Comments, Comments.siteID == SiteStatus.siteID, isouter=True) \
+            .group_by(SiteStatus.siteID) \
+            .order_by(db.func.count(Comments.commID).desc()) \
+            .paginate(page=page, per_page=ROWS_PER_PAGE)
 
-  site_schema = SiteStatusNestSchema(many=True)
-  output = site_schema.dump(result.items)
-
-  return jsonify(output)
+    site_schema = SiteStatusNestSchema(many=True)
+    output = site_schema.dump(result.items)
+  except exc.DBAPIError as e:
+    return jsonify({
+      'Status':f'Failed',
+      'ErrorMessage':e
+    })
+  return jsonify({'Status':f'Success'},output)
 
 # Separates Chinese and English Character for filter
 def separateCHN(n, n_c):
   for i in re.findall(r'[\u4e00-\u9fff]+', n):
     n = n.replace(i, '')
     n_c+=i
-
   return n.strip(' ').lower(), n_c.strip(' ').lower()
 
+# Sort site by comment count with area/name filters
+# Expected Input:  page (INT) | area (STR) | name (STR)
 @app.route('/sortSiteWithSearch/', methods = ['GET'])
 def sortSiteWithSearch(page=1):
   page = request.args.get('page', 1, type=int)
   area = request.args.get('area', '', type=str)
   name = request.args.get('name', '', type=str)
   ROWS_PER_PAGE = 100
-  
-  result = db.session.query(SiteStatus) \
-          .join(Comments, Comments.siteID == SiteStatus.siteID, isouter=True) \
-          .group_by(SiteStatus.siteID) \
-          .order_by(db.func.count(Comments.commID).desc()) \
-          .paginate(page=page, per_page=ROWS_PER_PAGE)
+  name_CHN = ''
+  area_CHN = ''
+  try:
+    result = db.session.query(SiteStatus) \
+            .join(Comments, Comments.siteID == SiteStatus.siteID, isouter=True) \
+            .group_by(SiteStatus.siteID) \
+            .order_by(db.func.count(Comments.commID).desc()) \
+            .paginate(page=page, per_page=ROWS_PER_PAGE)
 
-  site_schema = SiteStatusNestSchema(many=True)
-  output = site_schema.dump(result.items)
+    site_schema = SiteStatusNestSchema(many=True)
+    output = site_schema.dump(result.items)
+    
+    if area:
+      area, area_CHN = separateCHN(area, area_CHN)
+    if name:  
+      name, name_CHN = separateCHN(name, name_CHN)
 
-  area_CHN = ""
-  area, area_CHN = separateCHN(area, area_CHN)
+    for item in list(output):
+      if (len(name_CHN) > 0 and name_CHN not in item['info'][0]['siteName'].lower()) or \
+        (len(area_CHN)> 0 and area_CHN not in item['info'][0]['siteArea'].lower()):
+        output.remove(item)
+      if ((len(name) > 0 and name not in item['infoEng'][0]['siteNameEN'].lower()) or \
+        (len(area)> 0 and area not in item['infoEng'][0]['siteAreaEN'].lower())) and \
+        item in output:
+        output.remove(item)
+  except exc.DBAPIError as e:
+    return jsonify({
+      'Status':f'Failed',
+      'ErrorMessage':e
+    })
 
-  name_CHN = ""
-  name, name_CHN = separateCHN(name, name_CHN)
+  return jsonify({'Status':f'Success'},output)
 
-  for item in list(output):
-    if (len(name_CHN) > 0 and name_CHN not in item['info'][0]['siteName'].lower()) or \
-      (len(area_CHN)> 0 and area_CHN not in item['info'][0]['siteArea'].lower()):
-      output.remove(item)
-    if ((len(name) > 0 and name not in item['infoEng'][0]['siteNameEN'].lower()) or \
-      (len(area)> 0 and area not in item['infoEng'][0]['siteAreaEN'].lower())) and \
-      item in output:
-      output.remove(item)
-
-  return jsonify(output)
-
+# Return sites with no bike
 @app.route('/getSiteWithNoBike/', methods = ['GET'])
 def getSiteWithNoBike():
+  try:
+    sites = SiteStatus.query.filter_by(avalBike=0).all()
+    site_schema = SiteStatusSchema(many=True)
+    output = site_schema.dump(sites)
+  except exc.DBAPIError as e:
+    return jsonify({
+      'Status':f'Failed',
+      'ErrorMessage':e
+    })
 
-  sites = SiteStatus.query.filter_by(avalBike=0).all()
-  site_schema = SiteStatusSchema(many=True)
-  output = site_schema.dump(sites)
-
-  return jsonify(output)
+  return jsonify({'Status':f'Success'},output)
 
 if __name__ == '__main__':
   app.run(debug=True)
