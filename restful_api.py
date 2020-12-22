@@ -1,142 +1,23 @@
-from flask import Flask, request, jsonify, session
-from flask_sqlalchemy import SQLAlchemy
-from flask_restful import Api
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_marshmallow import Marshmallow
-from sqlalchemy import exc
 import re
 
+from flask import Flask, jsonify, request, session
+from flask_jwt_extended import JWTManager
+from flask_marshmallow import Marshmallow
+from flask_restful import Api
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import exc
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from config import *
+from models import *
 
 app = Flask("EverFortuneAI")
 api = Api(app)
-app.config.from_pyfile('config.py')
+app.config.from_object(MyConfig)
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
+jwt = JWTManager(app)
 
-#===================================================================================================
-# Marshmallow model declarations, for better transition b/w sqlalchemy to json
-class Comments(db.Model):
-  __tablename__ = 'Comments'
-  __table_args__ = {"schema": "sys"}
-
-  commID = db.Column(db.Integer, primary_key=True)
-  commDet = db.Column(db.Text)
-  userID = db.Column(db.Integer, db.ForeignKey('sys.User_Login.userID'))
-  siteID = db.Column(db.String(4), db.ForeignKey('sys.Site_Status.siteID'))
-
-  def __init__(self, commDet, userID, siteID):
-    self.commDet = commDet
-    self.userID = userID
-    self.siteID = siteID
-
-class UserLogin(db.Model):
-  __tablename__ = 'User_Login'
-  __table_args__ = {"schema": "sys"}
-
-  userID = db.Column(db.Integer, primary_key=True)
-  accName = db.Column(db.String(30), unique=True)
-  displayName = db.Column(db.String(30))
-  pwHash = db.Column(db.String(40))
-
-  def __init__(self, accName, displayName, pwHash):
-    self.accName = accName
-    self.displayName = displayName
-    self.pwHash = pwHash
-
-class SiteStatus(db.Model):
-  __tablename__ = 'Site_Status'
-  __table_args__ = {"schema": "sys"}
-  
-  siteID = db.Column(db.String(4), primary_key=True)
-  avalBike = db.Column(db.Integer)
-  modTime = db.Column(db.String(14))
-  act = db.Column(db.Boolean)
-  remainSpace = db.Column(db.Integer)
-  data = db.relationship("SiteData", backref="Site_Status")
-  info = db.relationship("SiteInfo", backref="Site_Status")
-  infoEng = db.relationship("SiteInfoEng", backref="Site_Status")
-
-  def __init__(self, siteID, avalBike, modTime, act, remainSpace):
-    self.siteID = siteID
-    self.avalBike = avalBike
-    self.modTime = modTime
-    self.act = act
-    self.remainSpace = remainSpace
-
-class SiteData(db.Model):
-  __tablename__ = 'Site_Data'
-  __table_args__ = {"schema": "sys"}
-  
-  siteID = db.Column(db.String(4), db.ForeignKey('sys.Site_Status.siteID'), primary_key=True)
-  totalSlot = db.Column(db.Integer)
-  Lat = db.Column(db.Float)
-  Lng = db.Column(db.Float)
-
-  def __init__(self, siteID, totalSlot, Lat, Lng):
-    self.siteID = siteID
-    self.totalSlot = totalSlot
-    self.Lat = Lat
-    self.Lng = Lng
-
-class SiteInfo(db.Model):
-  __tablename__ = 'Site_Info'
-  __table_args__ = {"schema": "sys"}
-  
-  siteID = db.Column(db.String(4), db.ForeignKey('sys.Site_Status.siteID'), primary_key=True)
-  siteName = db.Column(db.NVARCHAR(60))
-  siteArea = db.Column(db.NVARCHAR(60))
-  addr = db.Column(db.NVARCHAR(120))
-
-  def __init__(self, siteID, siteName, siteArea, addr):
-    self.siteID = siteID
-    self.siteName = siteName
-    self.siteArea = siteArea
-    self.addr = addr
-
-class SiteInfoEng(db.Model):
-  __tablename__ = 'Site_InfoEng'
-  __table_args__ = {"schema": "sys"}
-  
-  siteID = db.Column(db.String(4), db.ForeignKey('sys.Site_Status.siteID'), primary_key=True)
-  siteNameEN = db.Column(db.Text)
-  siteAreaEN = db.Column(db.Text)
-  addrEN = db.Column(db.Text)
-
-  def __init__(self, siteID, siteNameEN, siteAreaEN, addrEN):
-    self.siteID = siteID
-    self.siteNameEN = siteNameEN
-    self.siteAreaEN = siteAreaEN
-    self.addrEN = addrEN
-
-class SiteDataSchema(ma.Schema):
-  class Meta:
-    model = SiteData
-    fields = ('siteID', 'totalSlot', 'Lat', 'Lng')
-  
-class SiteInfoSchema(ma.Schema):
-  class Meta:
-    model = SiteInfo
-    fields = ('siteID', 'siteName', 'siteArea', 'addr')
-
-class SiteInfoEngSchema(ma.Schema):
-  class Meta:
-    model = SiteInfoEng
-    fields = ('siteID', 'siteNameEN', 'siteAreaEN', 'addrEN')
-
-class SiteStatusSchema(ma.Schema):
-  class Meta:  
-    model = SiteStatus
-    fields = ('siteID', 'avalBike', 'modTime', 'act', 'remainSpace')
-
-class SiteStatusNestSchema(ma.Schema):
-  class Meta:
-    model = SiteStatus
-    fields = ('siteID', 'avalBike', 'modTime', 'act', 'remainSpace', 'data', 'info', 'infoEng')
-  data = ma.Nested(SiteDataSchema, many=True)
-  info = ma.Nested(SiteInfoSchema, many=True)
-  infoEng = ma.Nested(SiteInfoEngSchema, many=True)
-
-#===================================================================================================
 # Register user into the system
 # Expected Input: accName (STR), displayName (STR), password (STR), password2 (STR)
 @app.route('/register/', methods = ['POST'])
@@ -168,7 +49,8 @@ def register():
     'Message': f'User registered.'
   }), 200
 
-# Logs current user into the system [NOTE: New User log in WILL be able to overwrite current user's session]
+# Logs current user into the system 
+# [NOTE: New User log in WILL be able to overwrite current user's session]
 # Expected Input: accName (STR), password (STR)
 @app.route('/login/', methods = ['POST'])
 def login():
@@ -178,7 +60,7 @@ def login():
       session['userID'] = user.userID
       session['accName'] = user.accName
       session['displayName'] = user.displayName
-      
+      session['logged_in'] = True
       return jsonify({ # Or return redirect(url_for('home'))
         'Status': f'Success',
         'Message': f'User logged in.'
@@ -197,7 +79,7 @@ def logout():
       'Status': f'Failed',
       'Message': f'Not logged in, cannot log out'
     }), 404
-
+  session['logged_in'] = False
   session.pop('accName', None)
 
   return jsonify({ # Or return redirect(url_for('home'))
@@ -210,7 +92,7 @@ def logout():
 # Expected Input: siteID (CHAR(4)), comment (STR)
 @app.route('/comment/add/', methods = ['POST'])
 def addComment():
-  if 'accName' not in session:
+  if 'accName' not in session and session['logged_in']:
     return jsonify({ # Or return redirect(url_for('login'))
       'Status': f'Failed',
       'Message': f'Please Login before commenting'
@@ -239,7 +121,7 @@ def addComment():
 # Expected Input: commID (INT)
 @app.route('/comment/remove/', methods = ['POST'])
 def removeComment():
-  if 'accName' not in session:
+  if 'accName' not in session and session['logged_in']:
     return jsonify({ # Or return redirect(url_for('login'))
       'Status': f'Failed',
       'Message': f'Please Login before removing a comment'
@@ -263,7 +145,7 @@ def removeComment():
 # Expected Input: updatedComment (STR), commID (INT)
 @app.route('/comment/update/', methods = ['POST'])
 def updateComment():
-  if 'accName' not in session:
+  if 'accName' not in session and session['logged_in']:
     return jsonify({ # Or return redirect(url_for('login'))
       'Status': f'Failed',
       'Message': f'Please Login before updating a comment'
@@ -300,8 +182,7 @@ def sortSite(page=1):
     output = site_schema.dump(result.items)
   except exc.DBAPIError as e:
     return jsonify({
-      'Status':f'Failed',
-      'ErrorMessage':e
+      'Status':f'Failed'
     }), 404
   return jsonify({'Status':f'Success'},output), 200
 
@@ -346,8 +227,7 @@ def sortSiteWithSearch(page=1):
         output.remove(item)
   except exc.DBAPIError as e:
     return jsonify({
-      'Status':f'Failed',
-      'ErrorMessage':e
+      'Status':f'Failed'
     }), 404
 
   return jsonify({'Status':f'Success'},output), 200

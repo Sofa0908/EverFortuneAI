@@ -20,22 +20,8 @@ def reader():
 
 def first_parser(data, cur):
   for site in data:
-    # Site Data
-    ID = data[site]['sno']
-    Total = int(data[site]['tot'])
-    Lat = float(data[site]['lat'])
-    Lng = float(data[site]['lng'])
-    
-    sql = """
-    INSERT INTO sys.Site_Data (SiteID, TotalSlot, Lat, Lng) VALUES (%s, %s, %s, %s)
-    """
-    try:
-      cur.execute(sql, (ID, Total, Lat, Lng))
-    except (pymysql.Error, pymysql.Warning) as e:
-      print(e)
-      return False
-
     # Site Status
+    ID = data[site]['sno']
     Aval = int(data[site]['sbi'])
     ModTime = data[site]['mday']
     Active = int(data[site]['act'])
@@ -50,16 +36,30 @@ def first_parser(data, cur):
       print(e)
       return False
     
+    # Site Data
+    Total = int(data[site]['tot'])
+    Lat = float(data[site]['lat'])
+    Lng = float(data[site]['lng'])
+    
+    sql = """
+    INSERT INTO sys.Site_Data (SiteDataID, TotalSlot, Lat, Lng, SiteID) VALUES (%s, %s, %s, %s, %s)
+    """
+    try:
+      cur.execute(sql, (ID, Total, Lat, Lng, ID))
+    except (pymysql.Error, pymysql.Warning) as e:
+      print(e)
+      return False
+    
     # Site Info
     Name = data[site]['sna']
     Area = data[site]['sarea']
     Addr = data[site]['ar']
     
     sql = """
-    INSERT INTO sys.Site_Info (SiteID, SiteName, SiteArea, Addr) VALUES (%s, N%s, N%s, N%s)
+    INSERT INTO sys.Site_Info (SiteInfoID, SiteName, SiteArea, Addr, SiteID) VALUES (%s, N%s, N%s, N%s, %s)
     """
     try:
-      cur.execute(sql, (ID, Name, Area, Addr))
+      cur.execute(sql, (ID, Name, Area, Addr, ID))
     except (pymysql.Error, pymysql.Warning) as e:
       print(e)
       return False
@@ -70,10 +70,10 @@ def first_parser(data, cur):
     AddrEN = data[site]['aren']
 
     sql = """
-    INSERT INTO sys.Site_InfoEng (SiteID, SiteNameEN, SiteAreaEN, AddrEN) VALUES (%s, %s, %s, %s)
+    INSERT INTO sys.Site_InfoEng (SiteInfoENID, SiteNameEN, SiteAreaEN, AddrEN, SiteID) VALUES (%s, %s, %s, %s, %s)
     """
     try:
-      cur.execute(sql, (ID, NameEN, AreaEN, AddrEN))
+      cur.execute(sql, (ID, NameEN, AreaEN, AddrEN, ID))
     except (pymysql.Error, pymysql.Warning) as e:
       print(e)
       return False
