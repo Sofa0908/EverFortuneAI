@@ -46,8 +46,9 @@ def check_if_token_in_blacklist(decrypted_token):
 I tried to replace my simple user management with JWT for a more well 
 rounded solution. However I got stuck on python doesn't allow me to import 
 my resouces.py file (Hence the commented out lines above, code wouldn't run with it). 
-Still trying to figure out how to solve this problem, But due to time constraints 
-I thought it would be better if I can turn it in on Wednesday Morning.
+Still trying to figure out how to solve this problem, But due to time constraints, 
+I thought it would be more efficient if I can turn it in on Tuesday Night with 
+the current user management system.
 '''
 
 # Register user into the system
@@ -83,7 +84,6 @@ def register():
   }), 200
 
 # Logs current user into the system 
-# [NOTE: New User log in WILL be able to overwrite current user's session]
 # Expected Input: accName (STR), password (STR)
 @app.route('/login/', methods = ['POST'])
 def login():
@@ -97,7 +97,6 @@ def login():
     if check_password_hash(user.pwHash, request.json['password']):
       session['userID'] = user.userID
       session['accName'] = user.accName
-      session['displayName'] = user.displayName
       return jsonify({ # Or return redirect(url_for('home'))
         'Status': f'Success',
         'Message': f'User logged in.'
@@ -238,7 +237,7 @@ def sortSite(page=1):
     return jsonify({
       'Status':f'Failed',
       'Error': str(e)
-    }), 404
+    }), 400
   return jsonify({'Status':f'Success'},output), 200
 
 # Separates Chinese and English Character for filter
@@ -284,7 +283,7 @@ def sortSiteWithSearch(page=1):
     return jsonify({
       'Status':f'Failed',
       'Error': str(e)
-    }), 404
+    }), 400
 
   return jsonify({'Status':f'Success'},output), 200
 
@@ -299,7 +298,7 @@ def getSiteWithNoBike():
     return jsonify({
       'Status':f'Failed',
       'Error': str(e)
-    }), 404
+    }), 400
 
   return jsonify({'Status':f'Success'},output), 200
 
