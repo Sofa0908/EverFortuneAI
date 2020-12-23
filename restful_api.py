@@ -113,7 +113,7 @@ def registration():
   accName = request.json['accName']
 
   if UserLogin.find_by_accName(accName):
-    return {'message': f'user name {accName} already exists'}
+    return {'message': f'user name {accName} already exists'}, 400
   
   new_user = UserLogin(
     accName = accName,
@@ -130,7 +130,7 @@ def registration():
       'Message': f'User {accName} created',
       'access_token': access_token,
       'refresh_token': refresh_token
-    }
+    }, 200
   except:
     return {'Message': 'Something went wrong'}, 500
 
@@ -143,7 +143,7 @@ def login():
   cur_user = UserLogin.find_by_accName(accName)
 
   if not cur_user:
-    return {'Message': f'User {accName} does not exist'}
+    return {'Message': f'User {accName} does not exist'}, 400
 
   if UserLogin.verify_hash(request.json['password'], cur_user.pwHash):
     access_token = create_access_token(identity=accName)
@@ -153,9 +153,9 @@ def login():
       'message': f'Logged in as {accName}',
       'access_token': access_token,
       'refresh_token': refresh_token
-      }
+      }, 200
   else:
-    return {'message': "Wrong credentials"}
+    return {'message': "Wrong credentials"}, 401
 
 # JWT Logout access
 @app.route('/logout/access/', methods = ['POST'])
@@ -166,7 +166,7 @@ def logoutAccess():
     #revoking access token
     revoked_token = RevokedTokenModel(jti=jti)
     revoked_token.add()
-    return{'Message':f'Access token revoked'}
+    return {'Message':f'Access token revoked'}, 200
   except:
     return {'Message': 'Something went wrong'}, 500
 
@@ -180,7 +180,7 @@ def logoutRefresh():
     revoked_token = RevokedTokenModel(jti=jti)
     revoked_token.add()
     pdb.set_trace()
-    return {'Message': 'Refresh token revoked'}
+    return {'Message': 'Refresh token revoked'}, 200
   except:
     return {'Message': 'Something went wrong'}, 500
 
@@ -190,7 +190,7 @@ def logoutRefresh():
 def tokenRefresh():
   cur_user = get_jwt_identity()
   access_token = create_access_token(identity=cur_user)
-  return {'access_token': access_token}
+  return {'access_token': access_token}, 200
 
 # JWT simple test for token validity
 @app.route('/secret/', methods = ['GET'])

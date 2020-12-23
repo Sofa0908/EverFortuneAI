@@ -114,8 +114,7 @@ class SiteStatusNestSchema(ma.Schema):
   info = ma.Nested(SiteInfoSchema, many=True)
   infoEng = ma.Nested(SiteInfoEngSchema, many=True)
 
-# User Model class, I apologize for the bad name, 
-# I named it early for the sake of User Login Info...
+# User Model class
 class UserLogin(db.Model):
   __tablename__ = 'User_Login'
   __table_args__ = {"schema": "sys"}
