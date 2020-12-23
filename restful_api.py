@@ -132,7 +132,6 @@ def registration():
       'refresh_token': refresh_token
     }
   except:
-    db.session.rollback()
     return {'Message': 'Something went wrong'}, 500
 
 # JWT login
@@ -163,7 +162,6 @@ def login():
 @jwt_required
 def logoutAccess():
   jti = get_raw_jwt()['jti']
-
   try:
     #revoking access token
     revoked_token = RevokedTokenModel(jti=jti)
@@ -195,10 +193,11 @@ def tokenRefresh():
   return {'access_token': access_token}
 
 # JWT simple test for token validity
-@app.route('/test', methods = ['GET'])
+@app.route('/secret/', methods = ['GET'])
 @jwt_required
 def TestSecretAccess(self):
-  return {'answer': 'Okay, it is working, jwt let\'s goooo'}
+  current_user = get_jwt_identity() 
+  return {'answer': 'Okay, it is working, jwt let\'s goooo'}, 200
 
 #===================================================================================================
 # Add Comments to site
@@ -297,7 +296,7 @@ def updateComment():
 
 #===================================================================================================
 # Sort site by comment count
-@app.route('/siteByComment/', methods = ['GET'])
+@app.route('/site-by-comment/', methods = ['GET'])
 def sortSite(page=1):
   page = request.args.get('page', 1, type=int)
   ROWS_PER_PAGE = 100
@@ -327,7 +326,7 @@ def separateCHN(n):
 
 # Sort site by comment count with area/name filters
 # Expected Input:  page (INT) | area (STR) | name (STR)
-@app.route('/siteWithSearch/', methods = ['GET'])
+@app.route('/site-filter/', methods = ['GET'])
 def sortSiteWithSearch(page=1):
   page = request.args.get('page', 1, type=int)
   area = request.args.get('area', '', type=str)
@@ -365,7 +364,7 @@ def sortSiteWithSearch(page=1):
   return jsonify({'Status':f'Success'},output), 200
 
 # Return sites with no bike
-@app.route('/siteWithNoBike/', methods = ['GET'])
+@app.route('/site-no-bike/', methods = ['GET'])
 def getSiteWithNoBike():
   try:
     sites = SiteStatus.query.filter_by(avalBike=0).all()
