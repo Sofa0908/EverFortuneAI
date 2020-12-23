@@ -168,10 +168,11 @@ class RevokedTokenModel(db.Model):
   # check if token is black listed
   @classmethod
   def is_jti_blacklisted(cls, jti):
-    result = cls.query.filter_by(jti=jti).first
+    result = RevokedTokenModel.query.filter_by(jti=jti).first()
+    
     schema = RevokedSchema()
     out = schema.dump(result)
-
+    
     if len(out) < 1:
       return False
     else:

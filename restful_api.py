@@ -159,6 +159,7 @@ def removeComment():
     }), 401
   else:
     trash = Comments.query.filter_by(commID=int(request.json['commID'])).first()
+    
     if trash and int(trash.userID) == int(session['userID']):
       try:
         current_session = db.session.object_session(trash)
