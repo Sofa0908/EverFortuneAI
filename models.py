@@ -114,6 +114,10 @@ class SiteStatusNestSchema(ma.Schema):
   info = ma.Nested(SiteInfoSchema, many=True)
   infoEng = ma.Nested(SiteInfoEngSchema, many=True)
 
+class RevokedSchema(ma.Schema):
+  class Meta:
+    fields = ('id','jti')
+
 # User Model class
 class UserLogin(db.Model):
   __tablename__ = 'User_Login'
@@ -129,9 +133,6 @@ class UserLogin(db.Model):
     self.displayName = displayName
     self.pwHash = pwHash
 
-#===========================================================================
-  # Below are methods & class made to cope with JWT
-  
   # save user to db
   def save_to_db(self):
     db.session.add(self)
@@ -167,5 +168,11 @@ class RevokedTokenModel(db.Model):
   # check if token is black listed
   @classmethod
   def is_jti_blacklisted(cls, jti):
-    query = cls.query.filter_by(jti=jti).first
-    return bool(query)
+    result = cls.query.filter_by(jti=jti).first
+    schema = RevokedSchema()
+    out = schema.dump(result)
+
+    if len(out) < 1:
+      return False
+    else:
+      return True
