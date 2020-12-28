@@ -266,8 +266,12 @@ def sortSiteWithSearch(page=1):
     
     if area:
       area, area_CHN = separateCHN(area)
+    else:
+      area_CHN = ''
     if name:  
       name, name_CHN = separateCHN(name)
+    else:
+      name_CHN = ''
 
     for item in list(output):
       if (len(name_CHN) > 0 and name_CHN not in item['info'][0]['siteName'].lower()) or \
